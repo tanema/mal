@@ -72,10 +72,10 @@ func read_atom(rdr Reader) (MalType, error) {
 		str := (*token)[1 : len(*token)-1]
 		return strings.Replace(
 			strings.Replace(
-			 strings.Replace(
-			  strings.Replace(str, `\\`, "\u029e", -1),
-			  `\"`, `"`, -1),
-			 `\n`, "\n", -1),
+				strings.Replace(
+					strings.Replace(str, `\\`, "\u029e", -1),
+					`\"`, `"`, -1),
+				`\n`, "\n", -1),
 			"\u029e", "\\", -1), nil
 	} else if (*token)[0] == ':' {
 		return NewKeyword((*token)[1:len(*token)])
