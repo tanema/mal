@@ -1,13 +1,8 @@
 all:
 	go build -o ./build/wot ./cmd/wot
 
-clean:
-	rm -f ./build/wot
-
-
-step2_eval:
-	go build -o ./step2_eval ./cmd/wot
+step3_env:
+	go build -o ./step3_env ./cmd/wot
 
 clean:
-	rm -f ./step2_eval
-
+	rm -f ./step3_env

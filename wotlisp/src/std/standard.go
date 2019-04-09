@@ -3,34 +3,43 @@ package std
 import (
 	"errors"
 
+	"github.com/tanema/mal/wotlisp/src/env"
 	"github.com/tanema/mal/wotlisp/src/types"
 )
 
-var StdEnv = map[string]types.Base{
-	"+": func(a []types.Base) (types.Base, error) {
-		if e := assertArgNum(a, 2); e != nil {
-			return nil, e
-		}
-		return a[0].(int) + a[1].(int), nil
-	},
-	"-": func(a []types.Base) (types.Base, error) {
-		if e := assertArgNum(a, 2); e != nil {
-			return nil, e
-		}
-		return a[0].(int) - a[1].(int), nil
-	},
-	"*": func(a []types.Base) (types.Base, error) {
-		if e := assertArgNum(a, 2); e != nil {
-			return nil, e
-		}
-		return a[0].(int) * a[1].(int), nil
-	},
-	"/": func(a []types.Base) (types.Base, error) {
-		if e := assertArgNum(a, 2); e != nil {
-			return nil, e
-		}
-		return a[0].(int) / a[1].(int), nil
-	},
+func Define(e *env.Env) {
+	e.Set("+", add)
+	e.Set("-", sub)
+	e.Set("*", mul)
+	e.Set("/", div)
+}
+
+func add(e *env.Env, a []types.Base) (types.Base, error) {
+	if e := assertArgNum(a, 2); e != nil {
+		return nil, e
+	}
+	return a[0].(int) + a[1].(int), nil
+}
+
+func sub(e *env.Env, a []types.Base) (types.Base, error) {
+	if e := assertArgNum(a, 2); e != nil {
+		return nil, e
+	}
+	return a[0].(int) - a[1].(int), nil
+}
+
+func mul(e *env.Env, a []types.Base) (types.Base, error) {
+	if e := assertArgNum(a, 2); e != nil {
+		return nil, e
+	}
+	return a[0].(int) * a[1].(int), nil
+}
+
+func div(e *env.Env, a []types.Base) (types.Base, error) {
+	if e := assertArgNum(a, 2); e != nil {
+		return nil, e
+	}
+	return a[0].(int) / a[1].(int), nil
 }
 
 func assertArgNum(a []types.Base, expectedLen int) error {

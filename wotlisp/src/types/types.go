@@ -10,6 +10,12 @@ type (
 	Keyword string
 )
 
+type EnvType interface {
+	Find(key Symbol) EnvType
+	Set(key Symbol, value Base) Base
+	Get(key Symbol) (Base, error)
+}
+
 type List struct {
 	Forms []Base
 }
