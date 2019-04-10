@@ -5,17 +5,20 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/tanema/mal/wotlisp/src/core"
 	"github.com/tanema/mal/wotlisp/src/env"
 	"github.com/tanema/mal/wotlisp/src/printer"
 	"github.com/tanema/mal/wotlisp/src/reader"
 	"github.com/tanema/mal/wotlisp/src/runtime"
-	"github.com/tanema/mal/wotlisp/src/std"
 )
 
 func main() {
 	r := bufio.NewReader(os.Stdin)
-	defaultEnv := env.New(nil)
-	std.Define(defaultEnv)
+	defaultEnv, _ := env.New(nil, nil, nil)
+	for method, fn := range core.Namespace {
+		defaultEnv.Set(method, fn)
+	}
+	rep("(def! not (fn* (a) (if a false true)))", defaultEnv)
 	for {
 		fmt.Print("user> ")
 		text, err := r.ReadString('\n')
@@ -35,5 +38,5 @@ func rep(in string, e *env.Env) string {
 	if evalErr != nil {
 		return evalErr.Error()
 	}
-	return printer.Print(val)
+	return printer.Print(val, true)
 }

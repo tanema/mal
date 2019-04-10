@@ -8,15 +8,26 @@ import (
 
 type Env struct {
 	data  map[string]types.Base
-	outer *Env
+	outer types.Env
 }
 
-func New(outer *Env) *Env {
+func New(outer types.Env, binds, exprs []types.Base) (*Env, error) {
 	env := &Env{data: map[string]types.Base{}, outer: outer}
-	return env
+	for i, bind := range binds {
+		key, ok := bind.(types.Symbol)
+		if !ok {
+			return nil, fmt.Errorf("non-symbol bind value")
+		}
+		if key == "&" {
+			env.Set(binds[i+1].(types.Symbol), types.NewList(exprs[i:]...))
+			break
+		}
+		env.Set(key, exprs[i])
+	}
+	return env, nil
 }
 
-func (e *Env) Find(key types.Symbol) *Env {
+func (e *Env) Find(key types.Symbol) types.Env {
 	if _, ok := e.data[string(key)]; ok {
 		return e
 	} else if e.outer != nil {
@@ -34,5 +45,5 @@ func (e *Env) Get(key types.Symbol) (types.Base, error) {
 	if env == nil {
 		return nil, fmt.Errorf("variable %v not found", key)
 	}
-	return env.data[string(key)], nil
+	return env.(*Env).data[string(key)], nil
 }

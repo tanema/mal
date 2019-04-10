@@ -8,12 +8,17 @@ type (
 	Base    interface{}
 	Symbol  string
 	Keyword string
+	Func    func(Env, []Base) (Base, error)
 )
 
-type EnvType interface {
-	Find(key Symbol) EnvType
-	Set(key Symbol, value Base) Base
-	Get(key Symbol) (Base, error)
+type Env interface {
+	Find(Symbol) Env
+	Set(Symbol, Base)
+	Get(Symbol) (Base, error)
+}
+
+type Collection interface {
+	Data() []Base
 }
 
 type List struct {
@@ -24,9 +29,13 @@ func NewList(forms ...Base) *List {
 	return &List{Forms: forms}
 }
 
+func (l *List) Data() []Base { return l.Forms }
+
 type Vector struct {
 	Forms []Base
 }
+
+func (l *Vector) Data() []Base { return l.Forms }
 
 type Hashmap struct {
 	Forms map[Base]Base

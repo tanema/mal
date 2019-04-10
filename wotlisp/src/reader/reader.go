@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/tanema/mal/wotlisp/src/types"
 )
@@ -13,7 +14,13 @@ var (
 	ErrUnderflow = errors.New("EOF underflow error: more input expected")
 
 	tokensPattern = regexp.MustCompile(`[\s,]*(~@|[\[\]{}()'` + "`" + `~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"` + "`" + `,;)]*)`)
-	numberPattern = regexp.MustCompile(`^-?[0-9]+$`)
+	numberPattern = regexp.MustCompile(`^-?[0-9]+\.?[0-9]*$`)
+
+	stringEsc = map[string]string{
+		`\\`: `\`,
+		`\"`: `"`,
+		`\n`: "\n",
+	}
 )
 
 type Reader struct {
@@ -157,17 +164,27 @@ func (reader *Reader) atom() (types.Base, error) {
 	} else if token[0] == ':' {
 		return types.Keyword(token[1:]), nil
 	} else if match := numberPattern.MatchString(token); match {
-		var i int
-		var e error
-		if i, e = strconv.Atoi(token); e != nil {
-			return nil, errors.New("number parse error")
+		num, err := strconv.ParseFloat(token, 64)
+		if err != nil {
+			err = errors.New("improperly formatted number")
 		}
-		return i, nil
+		return num, nil
 	} else if token[0] == '"' {
 		if token[len(token)-1] != '"' {
 			return nil, errors.New("expected '\"', got EOF")
 		}
-		return token[1 : len(token)-1], nil
+		str := token[1 : len(token)-1]
+		// for find, replace := range stringEsc {
+		//	str = strings.Replace(str, find, replace, -1)
+		// }
+		return strings.Replace(
+			strings.Replace(
+				strings.Replace(
+					strings.Replace(str, `\\`, "\u029e", -1),
+					`\"`, `"`, -1),
+				`\n`, "\n", -1),
+			"\u029e", "\\", -1), nil
+		//return str, nil
 	}
 
 	return types.Symbol(token), nil

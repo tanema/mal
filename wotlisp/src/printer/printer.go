@@ -7,28 +7,42 @@ import (
 	"github.com/tanema/mal/wotlisp/src/types"
 )
 
-func formatlist(forms []types.Base, pre, post, join string) string {
+var strRepl = map[string]string{
+	`\`:  `\\`,
+	`"`:  `\"`,
+	"\n": `\n`,
+}
+
+func List(forms []types.Base, pretty bool, pre, post, join string) string {
 	strList := make([]string, len(forms))
 	for i, e := range forms {
-		strList[i] = Print(e)
+		strList[i] = Print(e, pretty)
 	}
 	return pre + strings.Join(strList, join) + post
 }
 
-func Print(object types.Base) string {
+func Print(object types.Base, pretty bool) string {
 	switch tobj := object.(type) {
-	case *types.List:
-		return formatlist(tobj.Forms, "(", ")", " ")
 	case *types.Vector:
-		return formatlist(tobj.Forms, "[", "]", " ")
+		return List(tobj.Forms, pretty, "[", "]", " ")
+	case *types.List:
+		return List(tobj.Forms, pretty, "(", ")", " ")
 	case *types.Hashmap:
-		return formatlist(tobj.ToList(), "{", "}", " ")
+		return List(tobj.ToList(), pretty, "{", "}", " ")
 	case types.Symbol:
 		return string(tobj)
 	case types.Keyword:
 		return ":" + string(tobj)
+	case types.Func:
+		return "#<function>"
 	case string:
-		return `"` + tobj + `"`
+		if pretty {
+			tobj = strings.Replace(tobj, `\`, `\\`, -1)
+			tobj = strings.Replace(tobj, `"`, `\"`, -1)
+			tobj = strings.Replace(tobj, "\n", `\n`, -1)
+			return `"` + tobj + `"`
+		}
+		return tobj
 	case bool:
 		if tobj {
 			return "true"
@@ -36,7 +50,7 @@ func Print(object types.Base) string {
 		return "false"
 	case nil:
 		return "nil"
-	case int, int32, int64, uint, uint32, uint64, float32, float64:
+	case float64:
 		return fmt.Sprintf("%v", tobj)
 	default:
 		return "error formatting datatype"
