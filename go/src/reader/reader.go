@@ -70,10 +70,10 @@ func read_atom(rdr Reader) (MalType, error) {
 			return nil, errors.New("expected '\"', got EOF")
 		}
 		str := (*token)[1 : len(*token)-1]
-		str = strings.Replace(str, `\\`, "\u029e", -1)
+		str = strings.Replace(str, `\\`, "\\", -1)
 		str = strings.Replace(str, `\"`, `"`, -1)
 		str = strings.Replace(str, `\n`, "\n", -1)
-		return strings.Replace(str, "\u029e", "\\", -1), nil
+		return str, nil
 	} else if (*token)[0] == ':' {
 		return NewKeyword((*token)[1:len(*token)])
 	} else if *token == "nil" {

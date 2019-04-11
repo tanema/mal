@@ -60,3 +60,10 @@ func (hm *Hashmap) ToList() []Base {
 	}
 	return values
 }
+
+type ExtFunc struct {
+	AST    Base
+	Params []Base
+	Env    Env
+	Fn     Func
+}

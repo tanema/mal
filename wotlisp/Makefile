@@ -1,8 +1,8 @@
 all:
 	go build -o ./build/wot ./cmd/wot
 
-step4_if_fn_do:
-	go build -o ./step4_if_fn_do ./cmd/wot
+step5_tco:
+	go build -o ./step5_tco ./cmd/wot
 
 clean:
-	rm -f ./step4_if_fn_do
+	rm -f ./step5_tco

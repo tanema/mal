@@ -8,28 +8,51 @@ import (
 )
 
 func Eval(object types.Base, e types.Env) (types.Base, error) {
-	switch tobject := object.(type) {
-	case *types.List:
-		if len(tobject.Forms) == 0 {
-			return tobject, nil
-		}
-		sym, _ := tobject.Forms[0].(types.Symbol)
-		switch sym {
-		case "do":
-			return evalDo(e, tobject.Forms[1:]...)
-		case "if":
-			return evalIf(e, tobject.Forms[1:]...)
-		case "fn*":
-			return evalFn(e, tobject.Forms[1:]...)
-		case "def!":
-			return evalDef(e, tobject.Forms[1:]...)
-		case "let*":
-			return evalLet(e, tobject.Forms[1:]...)
+	var err error
+	for {
+		switch tobject := object.(type) {
+		case *types.List:
+			if len(tobject.Forms) == 0 {
+				return tobject, nil
+			}
+			sym, _ := tobject.Forms[0].(types.Symbol)
+			switch sym {
+			case "do":
+				object, err = evalDo(e, tobject.Forms[1:]...)
+			case "if":
+				object, err = evalIf(e, tobject.Forms[1:]...)
+			case "fn*":
+				return evalFn(e, tobject.Forms[1:]...)
+			case "def!":
+				return evalDef(e, tobject.Forms[1:]...)
+			case "let*":
+				object, e, err = evalLet(e, tobject.Forms[1:]...)
+			default:
+				lst, err := evalAST(tobject, e)
+				if err != nil {
+					return nil, err
+				}
+				list := lst.(*types.List)
+				switch fn := list.Forms[0].(type) {
+				case types.Func:
+					return fn(e, list.Forms[1:])
+				case *types.ExtFunc:
+					newEnv, err := env.New(fn.Env, fn.Params, list.Forms[1:])
+					if err != nil {
+						return nil, err
+					}
+					object, e = fn.AST, newEnv
+				default:
+					return nil, fmt.Errorf("attempt to call non-function %v", list.Forms[0])
+				}
+			}
 		default:
-			return evalFnCall(e, tobject)
+			return evalAST(tobject, e)
 		}
-	default:
-		return evalAST(tobject, e)
+
+		if err != nil {
+			return nil, err
+		}
 	}
 }
 
@@ -74,13 +97,13 @@ func evalDef(e types.Env, args ...types.Base) (types.Base, error) {
 	return value, err
 }
 
-func evalLet(e types.Env, args ...types.Base) (types.Base, error) {
+func evalLet(e types.Env, args ...types.Base) (types.Base, types.Env, error) {
 	if len(args) < 2 {
-		return nil, fmt.Errorf("not enough arguments for  let* call")
+		return nil, nil, fmt.Errorf("not enough arguments for  let* call")
 	}
 	newEnv, err := env.New(e, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var definitions []types.Base
@@ -88,45 +111,25 @@ func evalLet(e types.Env, args ...types.Base) (types.Base, error) {
 	case types.Collection:
 		definitions = lst.Data()
 	default:
-		return nil, fmt.Errorf("invalid let* environment definition")
+		return nil, nil, fmt.Errorf("invalid let* environment definition")
 
 	}
 
 	for i := 0; i < len(definitions); i += 2 {
 		if _, err := evalDef(newEnv, definitions[i:]...); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	return Eval(args[1], newEnv)
-}
-
-func evalFnCall(e types.Env, list *types.List) (types.Base, error) {
-	lst, err := evalAST(list, e)
-	if err != nil {
-		return nil, err
-	}
-	list = lst.(*types.List)
-	fn, ok := list.Forms[0].(types.Func)
-	if !ok {
-		return nil, fmt.Errorf("attempt to call non-function %v", list.Forms[0])
-	}
-	return fn(e, list.Forms[1:])
+	return args[1], newEnv, nil
 }
 
 func evalDo(e types.Env, args ...types.Base) (types.Base, error) {
-	el, err := evalAST(types.NewList(args...), e)
+	_, err := evalAST(types.NewList(args[:len(args)-1]...), e)
 	if err != nil {
 		return nil, err
 	}
-	lst, isList := el.(*types.List)
-	if !isList {
-		return nil, fmt.Errorf("unexpected return from do")
-	}
-	if len(lst.Forms) == 0 {
-		return nil, nil
-	}
-	return lst.Forms[len(lst.Forms)-1], nil
+	return args[len(args)-1], nil
 }
 
 func evalIf(e types.Env, args ...types.Base) (types.Base, error) {
@@ -136,14 +139,14 @@ func evalIf(e types.Env, args ...types.Base) (types.Base, error) {
 	if condition, err := evalBool(e, args[0]); err != nil {
 		return nil, err
 	} else if condition {
-		return Eval(args[1], e)
+		return args[1], nil
 	} else if len(args) > 2 {
-		return Eval(args[2], e)
+		return args[2], nil
 	}
 	return nil, nil
 }
 
-func evalFn(closureEnv types.Env, args ...types.Base) (types.Func, error) {
+func evalFn(closureEnv types.Env, args ...types.Base) (types.Base, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("improperly formatted fn* statement")
 	}
@@ -156,12 +159,19 @@ func evalFn(closureEnv types.Env, args ...types.Base) (types.Func, error) {
 		return nil, fmt.Errorf("invalid fn* param declaration")
 	}
 
-	return func(e types.Env, arguments []types.Base) (types.Base, error) {
+	fn := func(e types.Env, arguments []types.Base) (types.Base, error) {
 		newEnv, err := env.New(closureEnv, params, arguments)
 		if err != nil {
 			return nil, err
 		}
 		return Eval(args[1], newEnv)
+	}
+
+	return &types.ExtFunc{
+		AST:    args[1],
+		Params: params,
+		Env:    closureEnv,
+		Fn:     fn,
 	}, nil
 }
 

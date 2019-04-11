@@ -7,12 +7,6 @@ import (
 	"github.com/tanema/mal/wotlisp/src/types"
 )
 
-var strRepl = map[string]string{
-	`\`:  `\\`,
-	`"`:  `\"`,
-	"\n": `\n`,
-}
-
 func List(forms []types.Base, pretty bool, pre, post, join string) string {
 	strList := make([]string, len(forms))
 	for i, e := range forms {
@@ -35,6 +29,8 @@ func Print(object types.Base, pretty bool) string {
 		return ":" + string(tobj)
 	case types.Func:
 		return "#<function>"
+	case *types.ExtFunc:
+		return "#<extfunction>"
 	case string:
 		if pretty {
 			tobj = strings.Replace(tobj, `\`, `\\`, -1)
@@ -51,7 +47,7 @@ func Print(object types.Base, pretty bool) string {
 	case nil:
 		return "nil"
 	case float64:
-		return fmt.Sprintf("%v", tobj)
+		return fmt.Sprintf("%f", tobj)
 	default:
 		return "error formatting datatype"
 	}
