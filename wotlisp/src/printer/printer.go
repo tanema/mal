@@ -31,6 +31,8 @@ func Print(object types.Base, pretty bool) string {
 		return "#<function>"
 	case *types.ExtFunc:
 		return "#<extfunction>"
+	case *types.Atom:
+		return "(atom " + Print(tobj.Val, pretty) + ")"
 	case string:
 		if pretty {
 			tobj = strings.Replace(tobj, `\`, `\\`, -1)
@@ -47,7 +49,7 @@ func Print(object types.Base, pretty bool) string {
 	case nil:
 		return "nil"
 	case float64:
-		return fmt.Sprintf("%f", tobj)
+		return fmt.Sprintf("%v", tobj)
 	default:
 		return "error formatting datatype"
 	}

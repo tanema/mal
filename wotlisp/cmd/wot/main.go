@@ -13,19 +13,32 @@ import (
 )
 
 func main() {
-	r := bufio.NewReader(os.Stdin)
-	defaultEnv, _ := env.New(nil, nil, nil)
-	for method, fn := range core.Namespace {
-		defaultEnv.Set(method, fn)
+	defaultEnv := core.DefaultNamespace()
+	if len(os.Args) > 1 {
+		core.Eval(defaultEnv, `(load-file "`+os.Args[1]+`")`, os.Args[2:]...)
+	} else {
+		runREPL(defaultEnv)
 	}
-	rep("(def! not (fn* (a) (if a false true)))", defaultEnv)
+}
+
+func runFile(e *env.Env, path string) error {
+	val, err := core.Eval(e, path)
+	if err != nil {
+		return err
+	}
+	fmt.Println(printer.Print(val, true))
+	return nil
+}
+
+func runREPL(env *env.Env) error {
+	r := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print("user> ")
 		text, err := r.ReadString('\n')
 		if err != nil {
-			panic(err)
+			return err
 		}
-		fmt.Println(rep(text, defaultEnv))
+		fmt.Println(rep(text, env))
 	}
 }
 

@@ -3,30 +3,135 @@ package core
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"reflect"
 
 	"github.com/tanema/mal/wotlisp/src/printer"
+	"github.com/tanema/mal/wotlisp/src/reader"
+	"github.com/tanema/mal/wotlisp/src/runtime"
 	"github.com/tanema/mal/wotlisp/src/types"
 )
 
-var Namespace = map[types.Symbol]types.Func{
-	"+":       add,
-	"-":       sub,
-	"*":       mul,
-	"/":       div,
-	"=":       equal,
-	"<":       lessThan,
-	"<=":      lessThanEqual,
-	">":       greaterThan,
-	">=":      greaterThanEqual,
-	"prn":     prn,
-	"println": prnln,
-	"pr-str":  prnstr,
-	"str":     str,
-	"list":    list,
-	"list?":   islist,
-	"empty?":  isempty,
-	"count":   count,
+var namespace = map[types.Symbol]types.Func{
+	"+":           add,
+	"-":           sub,
+	"*":           mul,
+	"/":           div,
+	"=":           equal,
+	"<":           lessThan,
+	"<=":          lessThanEqual,
+	">":           greaterThan,
+	">=":          greaterThanEqual,
+	"prn":         prn,
+	"println":     prnln,
+	"pr-str":      prnstr,
+	"str":         str,
+	"list":        list,
+	"list?":       islist,
+	"empty?":      isempty,
+	"count":       count,
+	"read-string": readString,
+	"slurp":       slurp,
+	"atom":        atom,
+	"atom?":       isatom,
+	"deref":       deref,
+	"reset!":      reset,
+	"swap!":       swap,
+}
+
+func eval(defaultEnv types.Env) types.Func {
+	return func(e types.Env, a []types.Base) (types.Base, error) {
+		if len(a) < 1 {
+			return nil, nil
+		}
+		return runtime.Eval(a[0], defaultEnv)
+	}
+}
+
+func atom(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	return &types.Atom{Val: a[0]}, nil
+}
+
+func isatom(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	_, is := a[0].(*types.Atom)
+	return is, nil
+}
+
+func deref(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	atom, ok := a[0].(*types.Atom)
+	if !ok {
+		return nil, errors.New("value is not atom")
+	}
+	return atom.Val, nil
+}
+
+func reset(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 2); err != nil {
+		return nil, err
+	}
+	atom, ok := a[0].(*types.Atom)
+	if !ok {
+		return nil, errors.New("value is not atom")
+	}
+	atom.Val = a[1]
+	return atom.Val, nil
+}
+
+func swap(e types.Env, a []types.Base) (types.Base, error) {
+	if len(a) < 2 {
+		return nil, errors.New("wrong number of arguments")
+	}
+	atom, ok := a[0].(*types.Atom)
+	if !ok {
+		return nil, errors.New("value is not atom")
+	}
+
+	arguments := append([]types.Base{atom.Val}, a[2:]...)
+	var value types.Base
+	var err error
+
+	switch fn := a[1].(type) {
+	case types.Func:
+		value, err = fn(e, arguments)
+	case *types.ExtFunc:
+		value, err = fn.Fn(e, arguments)
+	default:
+		return nil, fmt.Errorf("attempt to call non-function %v", a[1])
+	}
+	atom.Val = value
+	return value, err
+}
+
+func readString(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	source, ok := a[0].(string)
+	if !ok {
+		return nil, errors.New("cannot read source from non-string")
+	}
+	return reader.ReadString(source)
+}
+
+func slurp(e types.Env, a []types.Base) (types.Base, error) {
+	path, ok := a[0].(string)
+	if !ok {
+		return nil, errors.New("cannot read source from non-string path")
+	}
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("problem reading source file: %v", err)
+	}
+	return string(b), err
 }
 
 func prn(e types.Env, a []types.Base) (types.Base, error) {

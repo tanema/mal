@@ -6,6 +6,7 @@ import (
 
 type (
 	Base    interface{}
+	Atom    struct{ Val Base }
 	Symbol  string
 	Keyword string
 	Func    func(Env, []Base) (Base, error)
