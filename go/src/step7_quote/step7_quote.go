@@ -35,20 +35,20 @@ func quasiquote(ast MalType) MalType {
 		return List{[]MalType{Symbol{"quote"}, ast}, nil}
 	} else {
 		slc, _ := GetSlice(ast)
-		a0 := slc[0]
-		if Symbol_Q(a0) && (a0.(Symbol).Val == "unquote") {
+		if Symbol_Q(slc[0]) && (slc[0].(Symbol).Val == "unquote") {
 			return slc[1]
-		} else if is_pair(a0) {
-			slc0, _ := GetSlice(a0)
-			a00 := slc0[0]
-			if Symbol_Q(a00) && (a00.(Symbol).Val == "splice-unquote") {
+		} else if is_pair(slc[0]) {
+			slc0, _ := GetSlice(slc[0])
+			if Symbol_Q(slc0[0]) && (slc0[0].(Symbol).Val == "splice-unquote") {
 				return List{[]MalType{Symbol{"concat"},
 					slc0[1],
 					quasiquote(List{slc[1:], nil})}, nil}
 			}
 		}
+
+		fmt.Println(slc)
 		return List{[]MalType{Symbol{"cons"},
-			quasiquote(a0),
+			quasiquote(slc[0]),
 			quasiquote(List{slc[1:], nil})}, nil}
 	}
 }

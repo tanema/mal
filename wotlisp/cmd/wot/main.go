@@ -10,24 +10,25 @@ import (
 	"github.com/tanema/mal/wotlisp/src/printer"
 	"github.com/tanema/mal/wotlisp/src/reader"
 	"github.com/tanema/mal/wotlisp/src/runtime"
+	"github.com/tanema/mal/wotlisp/src/types"
 )
 
 func main() {
 	defaultEnv := core.DefaultNamespace()
 	if len(os.Args) > 1 {
-		core.Eval(defaultEnv, `(load-file "`+os.Args[1]+`")`, os.Args[2:]...)
+		runFile(defaultEnv, os.Args[1], os.Args[2:]...)
 	} else {
 		runREPL(defaultEnv)
 	}
 }
 
-func runFile(e *env.Env, path string) error {
-	val, err := core.Eval(e, path)
-	if err != nil {
-		return err
+func runFile(e *env.Env, path string, argv ...string) {
+	targv := make([]types.Base, len(argv))
+	for i, arg := range argv {
+		targv[i] = types.Base(arg)
 	}
-	fmt.Println(printer.Print(val, true))
-	return nil
+	e.Set("*ARGV*", types.NewList(targv...))
+	fmt.Println(rep(`(load-file "`+os.Args[1]+`")`, e))
 }
 
 func runREPL(env *env.Env) error {

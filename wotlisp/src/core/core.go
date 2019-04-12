@@ -8,7 +8,6 @@ import (
 
 	"github.com/tanema/mal/wotlisp/src/printer"
 	"github.com/tanema/mal/wotlisp/src/reader"
-	"github.com/tanema/mal/wotlisp/src/runtime"
 	"github.com/tanema/mal/wotlisp/src/types"
 )
 
@@ -37,15 +36,31 @@ var namespace = map[types.Symbol]types.Func{
 	"deref":       deref,
 	"reset!":      reset,
 	"swap!":       swap,
+	"cons":        cons,
+	"concat":      concat,
 }
 
-func eval(defaultEnv types.Env) types.Func {
-	return func(e types.Env, a []types.Base) (types.Base, error) {
-		if len(a) < 1 {
-			return nil, nil
-		}
-		return runtime.Eval(a[0], defaultEnv)
+func cons(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 2); err != nil {
+		return nil, err
 	}
+	col, ok := a[1].(types.Collection)
+	if !ok {
+		return nil, fmt.Errorf("cannot cons a non list")
+	}
+	return types.NewList(append([]types.Base{a[0]}, col.Data()...)...), nil
+}
+
+func concat(e types.Env, a []types.Base) (types.Base, error) {
+	final := []types.Base{}
+	for _, elm := range a {
+		col, ok := elm.(types.Collection)
+		if !ok {
+			return nil, fmt.Errorf("cannot cons a non list")
+		}
+		final = append(final, col.Data()...)
+	}
+	return types.NewList(final...), nil
 }
 
 func atom(e types.Env, a []types.Base) (types.Base, error) {
@@ -224,6 +239,9 @@ func checkEquality(val1, val2 types.Base) (bool, error) {
 	case *types.Hashmap:
 		other := val2.(*types.Hashmap)
 		return equalMaps(data.Forms, other.Forms)
+	case types.Symbol:
+		other := val2.(types.Symbol)
+		return data == other, nil
 	case types.Keyword:
 		other := val2.(types.Keyword)
 		return data == other, nil

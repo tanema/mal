@@ -1,8 +1,8 @@
 all:
 	go build -o ./build/wot ./cmd/wot
 
-step6_file:
-	go build -o ./step6_file ./cmd/wot
+step7_quote:
+	go build -o ./step7_quote ./cmd/wot
 
 clean:
-	rm -f ./step6_file
+	rm -f ./step7_quote

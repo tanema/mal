@@ -17,6 +17,13 @@ func Eval(object types.Base, e types.Env) (types.Base, error) {
 			}
 			sym, _ := tobject.Forms[0].(types.Symbol)
 			switch sym {
+			case "quote":
+				if len(tobject.Forms) < 2 {
+					return nil, nil
+				}
+				return tobject.Forms[1], nil
+			case "quasiquote":
+				object = evalQuasiQuote(e, tobject.Forms[1])
 			case "do":
 				object, err = evalDo(e, tobject.Forms[1:]...)
 			case "if":
@@ -192,6 +199,22 @@ func evalBool(e types.Env, condition types.Base) (bool, error) {
 	}
 }
 
+func evalQuasiQuote(e types.Env, object types.Base) types.Base {
+	pair, isp := isPair(object)
+	if !isp {
+		return types.NewList(types.Symbol("quote"), object)
+	}
+
+	if sym, ok := pair[0].(types.Symbol); ok && sym == "unquote" {
+		return pair[1]
+	} else if nextPair, isp := isPair(pair[0]); isp {
+		if sym, ok := nextPair[0].(types.Symbol); ok && sym == "splice-unquote" {
+			return types.NewList(types.Symbol("concat"), nextPair[1], evalQuasiQuote(e, types.NewList(pair[1:]...)))
+		}
+	}
+	return types.NewList(types.Symbol("cons"), evalQuasiQuote(e, pair[0]), evalQuasiQuote(e, types.NewList(pair[1:]...)))
+}
+
 func evalListForms(values []types.Base, env types.Env) ([]types.Base, error) {
 	var err error
 	forms := make([]types.Base, len(values))
@@ -202,4 +225,13 @@ func evalListForms(values []types.Base, env types.Env) ([]types.Base, error) {
 		}
 	}
 	return forms, nil
+}
+
+func isPair(val types.Base) ([]types.Base, bool) {
+	lst, isList := val.(types.Collection)
+	if !isList {
+		return []types.Base{}, false
+	}
+	data := lst.Data()
+	return data, len(data) > 0
 }
