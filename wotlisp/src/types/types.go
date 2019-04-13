@@ -13,6 +13,7 @@ type (
 )
 
 type Env interface {
+	Child([]Base, []Base) (Env, error)
 	Find(Symbol) Env
 	Set(Symbol, Base)
 	Get(Symbol) (Base, error)
@@ -63,8 +64,38 @@ func (hm *Hashmap) ToList() []Base {
 }
 
 type ExtFunc struct {
-	AST    Base
-	Params []Base
-	Env    Env
-	Fn     Func
+	AST     Base
+	Params  []Base
+	Env     Env
+	IsMacro bool
+	eval    func(Base, Env) (Base, error)
+}
+
+func NewFunc(env Env, eval func(Base, Env) (Base, error), args ...Base) (*ExtFunc, error) {
+	if len(args) < 2 {
+		return nil, errors.New("improperly formatted fn* statement")
+	}
+
+	var params []Base
+	switch tparams := args[0].(type) {
+	case Collection:
+		params = tparams.Data()
+	default:
+		return nil, errors.New("invalid fn* param declaration")
+	}
+
+	return &ExtFunc{
+		AST:    args[1],
+		Params: params,
+		Env:    env,
+		eval:   eval,
+	}, nil
+}
+
+func (fn *ExtFunc) Apply(arguments []Base) (Base, error) {
+	newEnv, err := fn.Env.Child(fn.Params, arguments)
+	if err != nil {
+		return nil, err
+	}
+	return fn.eval(fn.AST, newEnv)
 }

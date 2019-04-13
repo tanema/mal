@@ -3,13 +3,17 @@ package runtime
 import (
 	"fmt"
 
-	"github.com/tanema/mal/wotlisp/src/env"
 	"github.com/tanema/mal/wotlisp/src/types"
 )
 
 func Eval(object types.Base, e types.Env) (types.Base, error) {
 	var err error
 	for {
+		object, err = macroExpand(e, object)
+		if err != nil {
+			return nil, err
+		}
+
 		switch tobject := object.(type) {
 		case *types.List:
 			if len(tobject.Forms) == 0 {
@@ -28,8 +32,12 @@ func Eval(object types.Base, e types.Env) (types.Base, error) {
 				object, err = evalDo(e, tobject.Forms[1:]...)
 			case "if":
 				object, err = evalIf(e, tobject.Forms[1:]...)
+			case "defmacro!":
+				return evalDefMacro(e, tobject.Forms[1:]...)
+			case "macroexpand":
+				return macroExpand(e, tobject.Forms[1])
 			case "fn*":
-				return evalFn(e, tobject.Forms[1:]...)
+				return types.NewFunc(e, Eval, tobject.Forms[1:]...)
 			case "def!":
 				return evalDef(e, tobject.Forms[1:]...)
 			case "let*":
@@ -44,7 +52,7 @@ func Eval(object types.Base, e types.Env) (types.Base, error) {
 				case types.Func:
 					return fn(e, list.Forms[1:])
 				case *types.ExtFunc:
-					newEnv, err := env.New(fn.Env, fn.Params, list.Forms[1:])
+					newEnv, err := fn.Env.Child(fn.Params, list.Forms[1:])
 					if err != nil {
 						return nil, err
 					}
@@ -88,6 +96,19 @@ func evalAST(ast types.Base, env types.Env) (types.Base, error) {
 	}
 }
 
+func evalDefMacro(e types.Env, args ...types.Base) (types.Base, error) {
+	val, err := evalDef(e, args...)
+	if err != nil {
+		return nil, err
+	}
+	fn, ok := val.(*types.ExtFunc)
+	if !ok {
+		return nil, fmt.Errorf("non-func value passed to defmacro")
+	}
+	fn.IsMacro = true
+	return fn, nil
+}
+
 func evalDef(e types.Env, args ...types.Base) (types.Base, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("not enough arguments")
@@ -108,7 +129,7 @@ func evalLet(e types.Env, args ...types.Base) (types.Base, types.Env, error) {
 	if len(args) < 2 {
 		return nil, nil, fmt.Errorf("not enough arguments for  let* call")
 	}
-	newEnv, err := env.New(e, nil, nil)
+	newEnv, err := e.Child(nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -119,7 +140,6 @@ func evalLet(e types.Env, args ...types.Base) (types.Base, types.Env, error) {
 		definitions = lst.Data()
 	default:
 		return nil, nil, fmt.Errorf("invalid let* environment definition")
-
 	}
 
 	for i := 0; i < len(definitions); i += 2 {
@@ -153,43 +173,12 @@ func evalIf(e types.Env, args ...types.Base) (types.Base, error) {
 	return nil, nil
 }
 
-func evalFn(closureEnv types.Env, args ...types.Base) (types.Base, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("improperly formatted fn* statement")
-	}
-
-	var params []types.Base
-	switch tparams := args[0].(type) {
-	case types.Collection:
-		params = tparams.Data()
-	default:
-		return nil, fmt.Errorf("invalid fn* param declaration")
-	}
-
-	fn := func(e types.Env, arguments []types.Base) (types.Base, error) {
-		newEnv, err := env.New(closureEnv, params, arguments)
-		if err != nil {
-			return nil, err
-		}
-		return Eval(args[1], newEnv)
-	}
-
-	return &types.ExtFunc{
-		AST:    args[1],
-		Params: params,
-		Env:    closureEnv,
-		Fn:     fn,
-	}, nil
-}
-
 func evalBool(e types.Env, condition types.Base) (bool, error) {
 	value, err := Eval(condition, e)
 	if err != nil {
 		return false, err
 	}
 	switch tVal := value.(type) {
-	case float64:
-		return tVal == 0, nil
 	case bool:
 		return tVal, nil
 	case nil:
@@ -234,4 +223,42 @@ func isPair(val types.Base) ([]types.Base, bool) {
 	}
 	data := lst.Data()
 	return data, len(data) > 0
+}
+
+func isMacroCall(e types.Env, ast types.Base) (*types.List, bool) {
+	lst, isList := ast.(*types.List)
+	if !isList || len(lst.Forms) == 0 {
+		return lst, false
+	}
+
+	sym, ok := lst.Forms[0].(types.Symbol)
+	if !ok {
+		return lst, false
+	}
+
+	envVal, err := e.Get(sym)
+	if err != nil {
+		return lst, false
+	}
+
+	fn, ok := envVal.(*types.ExtFunc)
+	if !ok {
+		return lst, false
+	}
+
+	return lst, fn.IsMacro
+}
+
+func macroExpand(e types.Env, ast types.Base) (types.Base, error) {
+	list, is := isMacroCall(e, ast)
+	for ; is; list, is = isMacroCall(e, ast) {
+		var err error
+		sym := list.Forms[0].(types.Symbol)
+		val, _ := e.Get(sym)
+		ast, err = val.(*types.ExtFunc).Apply(list.Forms[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ast, nil
 }

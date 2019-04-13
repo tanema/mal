@@ -38,6 +38,58 @@ var namespace = map[types.Symbol]types.Func{
 	"swap!":       swap,
 	"cons":        cons,
 	"concat":      concat,
+	"nth":         nth,
+	"first":       first,
+	"rest":        rest,
+}
+
+func nth(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 2); err != nil {
+		return nil, err
+	}
+	col, ok := a[0].(types.Collection)
+	if !ok {
+		return nil, fmt.Errorf("cannot get the nth part of non collection")
+	}
+	n, ok := a[1].(float64)
+	if !ok {
+		return nil, fmt.Errorf("invalid value to index on collection")
+	}
+	data := col.Data()
+	if len(data) <= int(n) {
+		return nil, fmt.Errorf("index out of bounds")
+	}
+	return data[int(n)], nil
+}
+
+func first(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	col, ok := a[0].(types.Collection)
+	if !ok {
+		return nil, nil
+	}
+	data := col.Data()
+	if len(data) == 0 {
+		return nil, nil
+	}
+	return data[0], nil
+}
+
+func rest(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	col, ok := a[0].(types.Collection)
+	if !ok {
+		return types.NewList(), nil
+	}
+	data := col.Data()
+	if len(data) == 0 {
+		return types.NewList(), nil
+	}
+	return types.NewList(data[1:]...), nil
 }
 
 func cons(e types.Env, a []types.Base) (types.Base, error) {
@@ -118,7 +170,7 @@ func swap(e types.Env, a []types.Base) (types.Base, error) {
 	case types.Func:
 		value, err = fn(e, arguments)
 	case *types.ExtFunc:
-		value, err = fn.Fn(e, arguments)
+		value, err = fn.Apply(arguments)
 	default:
 		return nil, fmt.Errorf("attempt to call non-function %v", a[1])
 	}

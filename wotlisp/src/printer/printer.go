@@ -28,9 +28,13 @@ func Print(object types.Base, pretty bool) string {
 	case types.Keyword:
 		return ":" + string(tobj)
 	case types.Func:
-		return "#<function>"
+		return "#<std::function>"
 	case *types.ExtFunc:
-		return "#<extfunction>"
+		pre := "#<function "
+		if tobj.IsMacro {
+			pre = "#<macro "
+		}
+		return pre + List(tobj.Params, pretty, "[", "]", ", ") + Print(tobj.AST, pretty) + ">"
 	case *types.Atom:
 		return "(atom " + Print(tobj.Val, pretty) + ")"
 	case string:

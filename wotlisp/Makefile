@@ -1,8 +1,8 @@
 all:
 	go build -o ./build/wot ./cmd/wot
 
-step7_quote:
-	go build -o ./step7_quote ./cmd/wot
+step8_macros:
+	go build -o ./step8_macros ./cmd/wot
 
 clean:
-	rm -f ./step7_quote
+	rm -f ./step8_macros
