@@ -6,7 +6,7 @@ import (
 	"github.com/tanema/mal/wotlisp/src/types"
 )
 
-func Eval(object types.Base, e types.Env) (types.Base, error) {
+func Eval(e types.Env, object types.Base) (types.Base, error) {
 	var err error
 	for {
 		object, err = macroExpand(e, object)
@@ -21,6 +21,8 @@ func Eval(object types.Base, e types.Env) (types.Base, error) {
 			}
 			sym, _ := tobject.Forms[0].(types.Symbol)
 			switch sym {
+			case "try*":
+				object, err = evalTry(e, tobject.Forms[1:]...)
 			case "quote":
 				if len(tobject.Forms) < 2 {
 					return nil, nil
@@ -43,7 +45,7 @@ func Eval(object types.Base, e types.Env) (types.Base, error) {
 			case "let*":
 				object, e, err = evalLet(e, tobject.Forms[1:]...)
 			default:
-				lst, err := evalAST(tobject, e)
+				lst, err := evalAST(e, tobject)
 				if err != nil {
 					return nil, err
 				}
@@ -62,7 +64,7 @@ func Eval(object types.Base, e types.Env) (types.Base, error) {
 				}
 			}
 		default:
-			return evalAST(tobject, e)
+			return evalAST(e, tobject)
 		}
 
 		if err != nil {
@@ -71,7 +73,7 @@ func Eval(object types.Base, e types.Env) (types.Base, error) {
 	}
 }
 
-func evalAST(ast types.Base, env types.Env) (types.Base, error) {
+func evalAST(env types.Env, ast types.Base) (types.Base, error) {
 	switch tobject := ast.(type) {
 	case types.Symbol:
 		symVal, err := env.Get(tobject)
@@ -96,6 +98,42 @@ func evalAST(ast types.Base, env types.Env) (types.Base, error) {
 	}
 }
 
+func evalTry(e types.Env, args ...types.Base) (types.Base, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("not enough arguments")
+	}
+
+	var catch []types.Base
+	var catchDefined bool
+
+	if len(args) > 1 {
+		catch, catchDefined = isPair(args[1])
+		if catchDefined {
+			catchSym, isCatchSym := catch[0].(types.Symbol)
+			_, isErrSym := catch[1].(types.Symbol)
+			if len(catch) < 3 || !isCatchSym || catchSym != "catch*" || !isErrSym {
+				return nil, fmt.Errorf("invalid catch declaration")
+			}
+		}
+	}
+
+	val, evalErr := Eval(e, args[0])
+	if evalErr != nil && catchDefined {
+		binds := []types.Base{catch[1].(types.Symbol)}
+		exprs := []types.Base{string(evalErr.Error())}
+		if userErr, isUserErr := evalErr.(types.UserError); isUserErr {
+			exprs = []types.Base{userErr.Val}
+		}
+		newEnv, err := e.Child(binds, exprs)
+		if err != nil {
+			return nil, err
+		}
+		return Eval(newEnv, catch[2])
+	}
+
+	return val, evalErr
+}
+
 func evalDefMacro(e types.Env, args ...types.Base) (types.Base, error) {
 	val, err := evalDef(e, args...)
 	if err != nil {
@@ -118,7 +156,7 @@ func evalDef(e types.Env, args ...types.Base) (types.Base, error) {
 	if !ok {
 		return nil, fmt.Errorf("non-symbol bind value")
 	}
-	value, err := Eval(args[1], e)
+	value, err := Eval(e, args[1])
 	if err == nil {
 		e.Set(name, value)
 	}
@@ -152,7 +190,7 @@ func evalLet(e types.Env, args ...types.Base) (types.Base, types.Env, error) {
 }
 
 func evalDo(e types.Env, args ...types.Base) (types.Base, error) {
-	_, err := evalAST(types.NewList(args[:len(args)-1]...), e)
+	_, err := evalAST(e, types.NewList(args[:len(args)-1]...))
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +212,7 @@ func evalIf(e types.Env, args ...types.Base) (types.Base, error) {
 }
 
 func evalBool(e types.Env, condition types.Base) (bool, error) {
-	value, err := Eval(condition, e)
+	value, err := Eval(e, condition)
 	if err != nil {
 		return false, err
 	}
@@ -208,7 +246,7 @@ func evalListForms(values []types.Base, env types.Env) ([]types.Base, error) {
 	var err error
 	forms := make([]types.Base, len(values))
 	for i, form := range values {
-		forms[i], err = Eval(form, env)
+		forms[i], err = Eval(env, form)
 		if err != nil {
 			return forms, err
 		}

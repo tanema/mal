@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"fmt"
 )
 
 type (
@@ -43,13 +44,23 @@ type Hashmap struct {
 	Forms map[Base]Base
 }
 
-func NewHashmap(values []Base) (*Hashmap, error) {
+func NewHashmap(values []Base, excludeKeys ...Base) (*Hashmap, error) {
 	if len(values)%2 == 1 {
 		return nil, errors.New("Odd number of arguments to NewHashMap")
 	}
 	m := map[Base]Base{}
 	for i := 0; i < len(values); i += 2 {
-		m[values[i]] = values[i+1]
+		key := values[i]
+		found := false
+		for _, exclude := range excludeKeys {
+			if key == exclude {
+				found = true
+				break
+			}
+		}
+		if !found {
+			m[key] = values[i+1]
+		}
 	}
 	return &Hashmap{Forms: m}, nil
 }
@@ -63,15 +74,31 @@ func (hm *Hashmap) ToList() []Base {
 	return values
 }
 
+func (hm *Hashmap) Keys() []Base {
+	keys := make([]Base, 0, len(hm.Forms))
+	for k := range hm.Forms {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (hm *Hashmap) Vals() []Base {
+	vals := make([]Base, 0, len(hm.Forms))
+	for _, v := range hm.Forms {
+		vals = append(vals, v)
+	}
+	return vals
+}
+
 type ExtFunc struct {
 	AST     Base
 	Params  []Base
 	Env     Env
 	IsMacro bool
-	eval    func(Base, Env) (Base, error)
+	eval    func(Env, Base) (Base, error)
 }
 
-func NewFunc(env Env, eval func(Base, Env) (Base, error), args ...Base) (*ExtFunc, error) {
+func NewFunc(env Env, eval func(Env, Base) (Base, error), args ...Base) (*ExtFunc, error) {
 	if len(args) < 2 {
 		return nil, errors.New("improperly formatted fn* statement")
 	}
@@ -97,5 +124,24 @@ func (fn *ExtFunc) Apply(arguments []Base) (Base, error) {
 	if err != nil {
 		return nil, err
 	}
-	return fn.eval(fn.AST, newEnv)
+	return fn.eval(newEnv, fn.AST)
+}
+
+func CallFunc(e Env, baseFn Base, arguments []Base) (Base, error) {
+	switch fn := baseFn.(type) {
+	case Func:
+		return fn(e, arguments)
+	case *ExtFunc:
+		return fn.Apply(arguments)
+	default:
+		return nil, fmt.Errorf("attempt to call non-function %v", baseFn)
+	}
+}
+
+type UserError struct {
+	Val Base
+}
+
+func (err UserError) Error() string {
+	return "User Error"
 }

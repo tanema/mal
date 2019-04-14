@@ -41,6 +41,238 @@ var namespace = map[types.Symbol]types.Func{
 	"nth":         nth,
 	"first":       first,
 	"rest":        rest,
+	"throw":       throw,
+	"apply":       apply,
+	"map":         mapvals,
+	"nil?":        isnil,
+	"true?":       istrue,
+	"false?":      isfalse,
+	"symbol?":     issymbol,
+	"symbol":      makesymbol,
+	"keyword?":    iskeyword,
+	"keyword":     makekeyword,
+	"vector?":     isvector,
+	"vector":      makevector,
+	"map?":        ismap,
+	"hash-map":    makemap,
+	"assoc":       assoc,
+	"dissoc":      dissoc,
+	"get":         get,
+	"contains?":   contains,
+	"keys":        keys,
+	"vals":        vals,
+	"sequential?": sequential,
+}
+
+func assoc(e types.Env, a []types.Base) (types.Base, error) {
+	if len(a) < 3 {
+		return nil, errors.New("wrong number of arguments")
+	}
+	hmap, isHmap := a[0].(*types.Hashmap)
+	if !isHmap {
+		return nil, errors.New("cannot assoc with non-hashmap")
+	}
+	return types.NewHashmap(append(hmap.ToList(), a[1:]...))
+}
+
+func dissoc(e types.Env, a []types.Base) (types.Base, error) {
+	if len(a) < 2 {
+		return nil, errors.New("wrong number of arguments")
+	}
+	hmap, isHmap := a[0].(*types.Hashmap)
+	if !isHmap {
+		return nil, errors.New("cannot dissoc with non-hashmap")
+	}
+	return types.NewHashmap(hmap.ToList(), a[1:]...)
+}
+
+func get(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 2); err != nil {
+		return nil, err
+	}
+	hmap, isHmap := a[0].(*types.Hashmap)
+	if !isHmap {
+		return nil, nil
+	}
+	return hmap.Forms[a[1]], nil
+}
+
+func contains(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 2); err != nil {
+		return nil, err
+	}
+	hmap, isHmap := a[0].(*types.Hashmap)
+	if !isHmap {
+		return nil, errors.New("cannot contains? with non-hashmap")
+	}
+	_, found := hmap.Forms[a[1]]
+	return found, nil
+}
+
+func keys(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	hmap, isHmap := a[0].(*types.Hashmap)
+	if !isHmap {
+		return nil, errors.New("cannot index keys with non-hashmap")
+	}
+	return types.NewList(hmap.Keys()...), nil
+}
+
+func vals(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	hmap, isHmap := a[0].(*types.Hashmap)
+	if !isHmap {
+		return nil, errors.New("cannot index keys with non-hashmap")
+	}
+	return types.NewList(hmap.Vals()...), nil
+}
+
+func sequential(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+
+	switch a[0].(type) {
+	case types.Collection:
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func throw(e types.Env, a []types.Base) (types.Base, error) {
+	if len(a) == 0 {
+		return nil, fmt.Errorf("standard error")
+	}
+	return nil, types.UserError{Val: a[0]}
+}
+
+func isnil(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	return a[0] == nil, nil
+}
+
+func istrue(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	val, isbool := a[0].(bool)
+	return isbool && val, nil
+}
+
+func isfalse(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	val, isbool := a[0].(bool)
+	return !isbool || !val, nil
+}
+
+func issymbol(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	_, isSymbol := a[0].(types.Symbol)
+	return isSymbol, nil
+}
+
+func makesymbol(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	val, isString := a[0].(string)
+	if !isString {
+		return nil, errors.New("cannot create symbol with non-string")
+	}
+	return types.Symbol(val), nil
+}
+
+func iskeyword(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	_, isKey := a[0].(types.Keyword)
+	return isKey, nil
+}
+
+func makekeyword(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	val, isString := a[0].(string)
+	if !isString {
+		return nil, errors.New("cannot create keyword with non-string")
+	}
+	return types.Keyword(val), nil
+}
+
+func isvector(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	_, isVect := a[0].(*types.Vector)
+	return isVect, nil
+}
+
+func makevector(e types.Env, a []types.Base) (types.Base, error) {
+	if len(a) < 1 {
+		return nil, errors.New("not enough arguments")
+	}
+	return &types.Vector{Forms: a[0:]}, nil
+}
+
+func ismap(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	_, isMap := a[0].(*types.Hashmap)
+	return isMap, nil
+}
+
+func makemap(e types.Env, a []types.Base) (types.Base, error) {
+	return types.NewHashmap(a)
+}
+
+func apply(e types.Env, a []types.Base) (types.Base, error) {
+	if len(a) < 2 {
+		return nil, fmt.Errorf("not enough arugments")
+	}
+	final := []types.Base{}
+	for _, val := range a[1:] {
+		if col, isCol := val.(types.Collection); isCol {
+			final = append(final, col.Data()...)
+		} else {
+			final = append(final, val)
+		}
+	}
+	return types.CallFunc(e, a[0], final)
+}
+
+func mapvals(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 2); err != nil {
+		return nil, err
+	}
+	col, ok := a[1].(types.Collection)
+	if !ok {
+		return nil, fmt.Errorf("invalid collection")
+	}
+
+	final := []types.Base{}
+	for _, val := range col.Data() {
+		val, err := types.CallFunc(e, a[0], []types.Base{val})
+		if err != nil {
+			return nil, err
+		}
+		final = append(final, val)
+	}
+
+	return types.NewList(final...), nil
 }
 
 func nth(e types.Env, a []types.Base) (types.Base, error) {
@@ -161,19 +393,8 @@ func swap(e types.Env, a []types.Base) (types.Base, error) {
 	if !ok {
 		return nil, errors.New("value is not atom")
 	}
-
 	arguments := append([]types.Base{atom.Val}, a[2:]...)
-	var value types.Base
-	var err error
-
-	switch fn := a[1].(type) {
-	case types.Func:
-		value, err = fn(e, arguments)
-	case *types.ExtFunc:
-		value, err = fn.Apply(arguments)
-	default:
-		return nil, fmt.Errorf("attempt to call non-function %v", a[1])
-	}
+	value, err := types.CallFunc(e, a[1], arguments)
 	atom.Val = value
 	return value, err
 }

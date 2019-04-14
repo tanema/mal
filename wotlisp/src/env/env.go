@@ -54,7 +54,7 @@ func (e *Env) Set(key types.Symbol, value types.Base) {
 func (e *Env) Get(key types.Symbol) (types.Base, error) {
 	env := e.Find(key)
 	if env == nil {
-		return nil, fmt.Errorf("variable %v not found", key)
+		return nil, fmt.Errorf("'%v' not found", key)
 	}
 	return env.(*Env).data[string(key)], nil
 }

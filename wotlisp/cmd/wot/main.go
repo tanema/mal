@@ -48,9 +48,9 @@ func rep(in string, e *env.Env) string {
 	if parseErr != nil {
 		return parseErr.Error()
 	}
-	val, evalErr := runtime.Eval(ast, e)
+	val, evalErr := runtime.Eval(e, ast)
 	if evalErr != nil {
-		return evalErr.Error()
+		return printer.Print(evalErr, true)
 	}
 	return printer.Print(val, true)
 }

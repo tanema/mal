@@ -37,6 +37,10 @@ func Print(object types.Base, pretty bool) string {
 		return pre + List(tobj.Params, pretty, "[", "]", ", ") + Print(tobj.AST, pretty) + ">"
 	case *types.Atom:
 		return "(atom " + Print(tobj.Val, pretty) + ")"
+	case types.UserError:
+		return "Exception: " + Print(tobj.Val, pretty)
+	case error:
+		return "Exception: " + tobj.Error()
 	case string:
 		if pretty {
 			tobj = strings.Replace(tobj, `\`, `\\`, -1)

@@ -31,7 +31,6 @@ func ev(e *env.Env, source string) {
 	if _, err := evalFn.(types.Func)(e, []types.Base{ast}); err != nil {
 		panic(err)
 	}
-
 }
 
 func eval(defaultEnv types.Env) types.Func {
@@ -39,6 +38,6 @@ func eval(defaultEnv types.Env) types.Func {
 		if len(a) < 1 {
 			return nil, nil
 		}
-		return runtime.Eval(a[0], defaultEnv)
+		return runtime.Eval(defaultEnv, a[0])
 	}
 }
