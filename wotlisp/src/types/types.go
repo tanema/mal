@@ -10,7 +10,6 @@ type (
 	Atom    struct{ Val Base }
 	Symbol  string
 	Keyword string
-	Func    func(Env, []Base) (Base, error)
 )
 
 type Env interface {
@@ -26,6 +25,7 @@ type Collection interface {
 
 type List struct {
 	Forms []Base
+	Meta  Base
 }
 
 func NewList(forms ...Base) *List {
@@ -36,12 +36,18 @@ func (l *List) Data() []Base { return l.Forms }
 
 type Vector struct {
 	Forms []Base
+	Meta  Base
+}
+
+func NewVect(forms ...Base) *Vector {
+	return &Vector{Forms: forms}
 }
 
 func (l *Vector) Data() []Base { return l.Forms }
 
 type Hashmap struct {
 	Forms map[Base]Base
+	Meta  Base
 }
 
 func NewHashmap(values []Base, excludeKeys ...Base) (*Hashmap, error) {
@@ -90,12 +96,22 @@ func (hm *Hashmap) Vals() []Base {
 	return vals
 }
 
+type StdFunc struct {
+	Fn   func(Env, []Base) (Base, error)
+	Meta Base
+}
+
+func Func(fn func(Env, []Base) (Base, error)) *StdFunc {
+	return &StdFunc{Fn: fn}
+}
+
 type ExtFunc struct {
 	AST     Base
 	Params  []Base
 	Env     Env
 	IsMacro bool
 	eval    func(Env, Base) (Base, error)
+	Meta    Base
 }
 
 func NewFunc(env Env, eval func(Env, Base) (Base, error), args ...Base) (*ExtFunc, error) {
@@ -127,10 +143,20 @@ func (fn *ExtFunc) Apply(arguments []Base) (Base, error) {
 	return fn.eval(newEnv, fn.AST)
 }
 
+func (fn *ExtFunc) Clone() *ExtFunc {
+	return &ExtFunc{
+		AST:     fn.AST,
+		Params:  fn.Params,
+		Env:     fn.Env,
+		eval:    fn.eval,
+		IsMacro: fn.IsMacro,
+	}
+}
+
 func CallFunc(e Env, baseFn Base, arguments []Base) (Base, error) {
 	switch fn := baseFn.(type) {
-	case Func:
-		return fn(e, arguments)
+	case *StdFunc:
+		return fn.Fn(e, arguments)
 	case *ExtFunc:
 		return fn.Apply(arguments)
 	default:

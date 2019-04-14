@@ -1,8 +1,8 @@
 all:
 	go build -o ./build/wot ./cmd/wot
 
-step9_try:
-	go build -o ./step9_try ./cmd/wot
+stepA_mal:
+	go build -o ./stepA_mal ./cmd/wot
 
 clean:
-	rm -f ./step9_try
+	rm -f ./stepA_mal

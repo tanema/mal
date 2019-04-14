@@ -51,8 +51,8 @@ func Eval(e types.Env, object types.Base) (types.Base, error) {
 				}
 				list := lst.(*types.List)
 				switch fn := list.Forms[0].(type) {
-				case types.Func:
-					return fn(e, list.Forms[1:])
+				case *types.StdFunc:
+					return fn.Fn(e, list.Forms[1:])
 				case *types.ExtFunc:
 					newEnv, err := fn.Env.Child(fn.Params, list.Forms[1:])
 					if err != nil {

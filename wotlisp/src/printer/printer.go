@@ -27,7 +27,7 @@ func Print(object types.Base, pretty bool) string {
 		return string(tobj)
 	case types.Keyword:
 		return ":" + string(tobj)
-	case types.Func:
+	case *types.StdFunc:
 		return "#<std::function>"
 	case *types.ExtFunc:
 		pre := "#<function "

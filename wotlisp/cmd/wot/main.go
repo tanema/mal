@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/tanema/mal/wotlisp/src/env"
 	"github.com/tanema/mal/wotlisp/src/printer"
 	"github.com/tanema/mal/wotlisp/src/reader"
+	"github.com/tanema/mal/wotlisp/src/readline"
 	"github.com/tanema/mal/wotlisp/src/runtime"
 	"github.com/tanema/mal/wotlisp/src/types"
 )
@@ -32,10 +32,8 @@ func runFile(e *env.Env, path string, argv ...string) {
 }
 
 func runREPL(env *env.Env) error {
-	r := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Print("user> ")
-		text, err := r.ReadString('\n')
+		text, err := readline.Readline("user> ")
 		if err != nil {
 			return err
 		}

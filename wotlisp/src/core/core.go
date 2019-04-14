@@ -5,63 +5,232 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
+	"strings"
+	"time"
 
 	"github.com/tanema/mal/wotlisp/src/printer"
 	"github.com/tanema/mal/wotlisp/src/reader"
+	"github.com/tanema/mal/wotlisp/src/readline"
 	"github.com/tanema/mal/wotlisp/src/types"
 )
 
-var namespace = map[types.Symbol]types.Func{
-	"+":           add,
-	"-":           sub,
-	"*":           mul,
-	"/":           div,
-	"=":           equal,
-	"<":           lessThan,
-	"<=":          lessThanEqual,
-	">":           greaterThan,
-	">=":          greaterThanEqual,
-	"prn":         prn,
-	"println":     prnln,
-	"pr-str":      prnstr,
-	"str":         str,
-	"list":        list,
-	"list?":       islist,
-	"empty?":      isempty,
-	"count":       count,
-	"read-string": readString,
-	"slurp":       slurp,
-	"atom":        atom,
-	"atom?":       isatom,
-	"deref":       deref,
-	"reset!":      reset,
-	"swap!":       swap,
-	"cons":        cons,
-	"concat":      concat,
-	"nth":         nth,
-	"first":       first,
-	"rest":        rest,
-	"throw":       throw,
-	"apply":       apply,
-	"map":         mapvals,
-	"nil?":        isnil,
-	"true?":       istrue,
-	"false?":      isfalse,
-	"symbol?":     issymbol,
-	"symbol":      makesymbol,
-	"keyword?":    iskeyword,
-	"keyword":     makekeyword,
-	"vector?":     isvector,
-	"vector":      makevector,
-	"map?":        ismap,
-	"hash-map":    makemap,
-	"assoc":       assoc,
-	"dissoc":      dissoc,
-	"get":         get,
-	"contains?":   contains,
-	"keys":        keys,
-	"vals":        vals,
-	"sequential?": sequential,
+var namespace = map[types.Symbol]*types.StdFunc{
+	"+":           types.Func(add),
+	"-":           types.Func(sub),
+	"*":           types.Func(mul),
+	"/":           types.Func(div),
+	"=":           types.Func(equal),
+	"<":           types.Func(lessThan),
+	"<=":          types.Func(lessThanEqual),
+	">":           types.Func(greaterThan),
+	">=":          types.Func(greaterThanEqual),
+	"prn":         types.Func(prn),
+	"println":     types.Func(prnln),
+	"pr-str":      types.Func(prnstr),
+	"str":         types.Func(str),
+	"list":        types.Func(list),
+	"list?":       types.Func(islist),
+	"empty?":      types.Func(isempty),
+	"count":       types.Func(count),
+	"read-string": types.Func(readString),
+	"slurp":       types.Func(slurp),
+	"atom":        types.Func(atom),
+	"atom?":       types.Func(isatom),
+	"deref":       types.Func(deref),
+	"reset!":      types.Func(reset),
+	"swap!":       types.Func(swap),
+	"cons":        types.Func(cons),
+	"concat":      types.Func(concat),
+	"nth":         types.Func(nth),
+	"first":       types.Func(first),
+	"rest":        types.Func(rest),
+	"throw":       types.Func(throw),
+	"apply":       types.Func(apply),
+	"map":         types.Func(mapvals),
+	"nil?":        types.Func(isnil),
+	"true?":       types.Func(istrue),
+	"false?":      types.Func(isfalse),
+	"symbol?":     types.Func(issymbol),
+	"symbol":      types.Func(makesymbol),
+	"keyword?":    types.Func(iskeyword),
+	"keyword":     types.Func(makekeyword),
+	"vector?":     types.Func(isvector),
+	"vector":      types.Func(makevector),
+	"map?":        types.Func(ismap),
+	"hash-map":    types.Func(makemap),
+	"assoc":       types.Func(assoc),
+	"dissoc":      types.Func(dissoc),
+	"get":         types.Func(get),
+	"contains?":   types.Func(contains),
+	"keys":        types.Func(keys),
+	"vals":        types.Func(vals),
+	"sequential?": types.Func(sequential),
+	"readline":    types.Func(rdline),
+	"meta":        types.Func(meta),
+	"with-meta":   types.Func(withmeta),
+	"string?":     types.Func(isstring),
+	"number?":     types.Func(isnumber),
+	"fn?":         types.Func(isfn),
+	"macro?":      types.Func(ismacro),
+	"conj":        types.Func(conj),
+	"seq":         types.Func(seq),
+	"time-ms":     types.Func(timems),
+}
+
+func timems(e types.Env, a []types.Base) (types.Base, error) {
+	return float64(time.Now().UnixNano()), nil
+}
+
+func conj(e types.Env, a []types.Base) (types.Base, error) {
+	if len(a) < 2 {
+		return nil, errors.New("wrong number of arguments")
+	}
+	switch v := a[0].(type) {
+	case *types.List:
+		result := []types.Base{}
+		for _, v := range a[1:] {
+			result = append([]types.Base{v}, result...)
+		}
+		return types.NewList(append(result, v.Forms...)...), nil
+	case *types.Vector:
+		return types.NewVect(append(v.Forms, a[1:]...)...), nil
+	default:
+		return nil, nil
+	}
+}
+
+func seq(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	switch v := a[0].(type) {
+	case types.Collection:
+		data := v.Data()
+		if len(data) == 0 {
+			return nil, nil
+		}
+		return types.NewList(data...), nil
+	case string:
+		if v == "" {
+			return nil, nil
+		}
+		result := make([]types.Base, len(v))
+		for i, ch := range strings.Split(v, "") {
+			result[i] = ch
+		}
+		return types.NewList(result...), nil
+	default:
+		return nil, nil
+	}
+}
+
+func isstring(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	switch a[0].(type) {
+	case string:
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func isnumber(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	switch a[0].(type) {
+	case float64:
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+func isfn(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	switch fn := a[0].(type) {
+	case *types.StdFunc:
+		return true, nil
+	case *types.ExtFunc:
+		return !fn.IsMacro, nil
+	default:
+		return false, nil
+	}
+}
+
+func ismacro(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	switch fn := a[0].(type) {
+	case *types.ExtFunc:
+		return fn.IsMacro, nil
+	default:
+		return false, nil
+	}
+}
+
+func rdline(e types.Env, a []types.Base) (types.Base, error) {
+	prompt := ""
+	if len(a) > 0 {
+		if p, isstring := a[0].(string); isstring {
+			prompt = p
+		}
+	}
+	return readline.Readline(prompt)
+}
+
+func meta(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 1); err != nil {
+		return nil, err
+	}
+	switch val := a[0].(type) {
+	case *types.List:
+		return val.Meta, nil
+	case *types.Vector:
+		return val.Meta, nil
+	case *types.Hashmap:
+		return val.Meta, nil
+	case *types.StdFunc:
+		return val.Meta, nil
+	case *types.ExtFunc:
+		return val.Meta, nil
+	default:
+		return nil, nil
+	}
+}
+
+func withmeta(e types.Env, a []types.Base) (types.Base, error) {
+	if err := assertArgNum(a, 2); err != nil {
+		return nil, err
+	}
+	switch val := a[0].(type) {
+	case *types.List:
+		list := types.NewList(val.Forms...)
+		list.Meta = a[1]
+		return list, nil
+	case *types.Vector:
+		vect := types.NewVect(val.Forms...)
+		vect.Meta = a[1]
+		return vect, nil
+	case *types.Hashmap:
+		hmap, _ := types.NewHashmap(val.ToList())
+		hmap.Meta = a[1]
+		return hmap, nil
+	case *types.StdFunc:
+		clonedFn := types.Func(val.Fn)
+		clonedFn.Meta = a[1]
+		return clonedFn, nil
+	case *types.ExtFunc:
+		clonedFn := val.Clone()
+		clonedFn.Meta = a[1]
+		return clonedFn, nil
+	default:
+		return nil, errors.New("invalid data type for metadata")
+	}
 }
 
 func assoc(e types.Env, a []types.Base) (types.Base, error) {
@@ -224,7 +393,7 @@ func makevector(e types.Env, a []types.Base) (types.Base, error) {
 	if len(a) < 1 {
 		return nil, errors.New("not enough arguments")
 	}
-	return &types.Vector{Forms: a[0:]}, nil
+	return types.NewVect(a[0:]...), nil
 }
 
 func ismap(e types.Env, a []types.Base) (types.Base, error) {
